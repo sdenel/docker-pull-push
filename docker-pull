@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+
+# TODO: répertoire de cache ?
+
+from tempfile import TemporaryDirectory
+import requests
+from pprint import pprint
+import sys
+import zlib
+from subprocess import call
+import os
+import shutil
+import tarfile
+
+def parse_argv(name):
+    """
+    >>> args = parse_argv('index.docker.io/library/nginx')
+    >>> args['registry']
+    'index.docker.io'
+    >>> args['repository']
+    'library/nginx'
+    >>> args['tag']
+    'latest'
+    >>> name_parsed = parse_argv('gcr.io/distroless/cc:latest')
+    >>> name_parsed['registry']
+    'gcr.io'
+    >>> name_parsed['repository']
+    'distroless/cc'
+    >>> name_parsed['tag']
+    'latest'
+    """
+    registry = name[:name.find('/')]
+
+    repository_raw = name[len(registry)+1:]
+    repository_split = repository_raw.split(':')
+    tag = 'latest' if len(repository_split)==1 else repository_split[-1]
+    
+    out = {}
+    out['registry'] = registry 
+    return {'registry': registry, 'repository': repository_split[0],'tag': tag}
+
+def get_url_from_auth_header(h):
+    """
+    >>> get_url_from_auth_header('Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull"')
+    'https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/nginx:pull'
+    """
+    start_key = 'Bearer realm="'
+    assert h.startswith(start_key)
+    h_stripped = h[len(start_key):]
+    out = h_stripped.replace('",', '?', 1)
+    out = out.replace('",', '&').replace('="', '=')
+    return out.rstrip('"')
+
+def get_token(url):
+    token_req = requests.get(url)
+    return token_req.json()['token']
+
+def pull(path, token = None):
+    headers = {} if token == None else {'Authorization': 'Bearer ' + token}
+    headers['Accept'] = 'application/vnd.docker.distribution.manifest.v2+json'
+    print('GET ' + path)
+    req = requests.get(path, headers=headers)
+    if req.status_code == 401:
+        www_auth = req.headers['Www-Authenticate']
+        assert www_auth.startswith('Bearer realm="')
+        url = www_auth.split('"')[2]
+        token = get_token(get_url_from_auth_header(www_auth))
+        return pull(path, token)
+    else:
+        assert req.status_code == 200
+        return req
+
+def pull_tar_gz_as_tar(cache_dir, url, name, path):
+    """
+    Get a layer in a compressed format, and saves it locally (unzipped).
+    The tar name is expected to contain a hash, thus to be cacheable.
+    """
+    cache_name = cache_dir + name
+    if not os.path.exists(cache_name):
+        response = pull(url + name).content
+        with open(cache_name, mode='wb') as localfile:
+            localfile.write(response)
+            shutil.move(cache_name, cache_name)
+    digest = name.split(':')[-1]
+    os.makedirs(path + '/' + digest)
+    shutil.copyfile(cache_name, path + '/' + digest + "/layer.tar.gz")
+    call(["gunzip", path + '/' + digest + "/layer.tar.gz"])
+
+        
+
+if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        print("docker-pull fullname target")
+        print("  Example: docker-pull index.docker.io/library/alpine my-image")
+        exit(1)
+
+    CACHE_DIR_ROOT = os.path.expanduser("~")
+    assert os.path.isdir(CACHE_DIR_ROOT)
+    CACHE_DIR = CACHE_DIR_ROOT + '/.docker-pull-layers-cache/'
+
+    if not os.path.exists(CACHE_DIR):
+        print("Creating cache directory: " + CACHE_DIR)
+        os.makedirs(CACHE_DIR)
+
+    with TemporaryDirectory() as temp_dir:
+        args = parse_argv(sys.argv[1])
+        web_manifest = pull('https://' + args['registry'] + '/v2/' + args['repository'] + "/manifests/" + args['tag']).json()
+        pprint(web_manifest)
+        config_digest = web_manifest['config']['digest']
+        config = pull('https://' + args['registry'] + '/v2/' + args['repository'] + "/blobs/" + config_digest).json()
+        import json
+
+        config_filename = config_digest.split(':')[1] + '.json'
+        with open(temp_dir + '/' + config_filename, 'w') as outfile:
+            json.dump(config, outfile)
+
+        layer_path_l = []
+        for layer in web_manifest['layers']:
+            path = layer['digest'].split(':')[-1] + "/layer.tar"
+            pull_tar_gz_as_tar(
+                CACHE_DIR,
+                'https://' + args['registry'] + '/v2/' + args['repository'] + "/blobs/",
+                layer['digest'],
+                temp_dir + '/' + path
+            )
+            layer_path_l.append(path)
+        
+        manifest = [{"Config": config_filename, "RepoTags": [], "Layers": layer_path_l}]
+        with open(temp_dir + '/' + 'manifest.json', 'w') as outfile:
+            json.dump(manifest, outfile)
+
+        with tarfile.open(sys.argv[2], "w") as tar_out:
+            os.chdir(temp_dir)
+            tar_out.add(".")
