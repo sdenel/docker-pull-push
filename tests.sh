@@ -6,8 +6,8 @@ set -e
 rm -f alpine
 ./docker-pull index.docker.io/library/alpine:3.8 alpine
 
-CONTENT=`tar tvf alpine | awk '{print $6}' | tr '\n' ' '`
-CONTENT_EXPECTED="./ ./manifest.json ./8e3ba11ec2a2b39ab372c60c16b421536e50e5ce64a0bc81765c2e38381bcff6/ ./8e3ba11ec2a2b39ab372c60c16b421536e50e5ce64a0bc81765c2e38381bcff6/layer.tar ./11cd0b38bc3ceb958ffb2f9bd70be3fb317ce7d255c8a4c3f4af30e298aa1aab.json "
+CONTENT=`tar tvf alpine | awk '{print $6}' | sort | tr '\n' ' '`
+CONTENT_EXPECTED="./ ./11cd0b38bc3ceb958ffb2f9bd70be3fb317ce7d255c8a4c3f4af30e298aa1aab.json ./8e3ba11ec2a2b39ab372c60c16b421536e50e5ce64a0bc81765c2e38381bcff6/ ./8e3ba11ec2a2b39ab372c60c16b421536e50e5ce64a0bc81765c2e38381bcff6/layer.tar ./manifest.json "
 if [[ "$CONTENT" != "$CONTENT_EXPECTED" ]]
 then
   echo "CONTENT is not equal to CONTENT_EXPECTED:"
