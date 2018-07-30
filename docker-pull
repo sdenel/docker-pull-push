@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 
-# TODO: répertoire de cache ?
-
 from tempfile import TemporaryDirectory
 import requests
-from pprint import pprint
 import sys
-from subprocess import call
 import os
 import shutil
 import tarfile
