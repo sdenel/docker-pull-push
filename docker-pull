@@ -82,9 +82,9 @@ def pull_tar_gz_as_tar(cache_dir, url, name, path):
             localfile.write(response)
             shutil.move(cache_name, cache_name)
     digest = name.split(':')[-1]
-    os.makedirs(path + '/' + digest)
-    shutil.copyfile(cache_name, path + '/' + digest + "/layer.tar.gz")
-    call(["gunzip", path + '/' + digest + "/layer.tar.gz"])
+    os.makedirs(path[:path.rfind('/')])
+    shutil.copyfile(cache_name, path)
+    call(["gunzip", path])
 
         
 
