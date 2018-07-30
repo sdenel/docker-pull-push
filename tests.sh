@@ -5,7 +5,9 @@ set -e
 
 rm -f alpine
 ./docker-pull index.docker.io/library/alpine alpine
-LOADED_IMAGE_ID=`docker load < alpine | tail -n 1 | cut -d ':' -f 3`
+DOCKER_LOADING=`docker load < alpine`
+echo $DOCKER_LOADING
+LOADED_IMAGE_ID=`echo $DOCKER_LOADING | tail -n 1 | cut -d ':' -f 3`
 OUTPUT=`docker run $LOADED_IMAGE_ID echo "Hello world"`
 if [[ "$OUTPUT" != "Hello world" ]]
 then
