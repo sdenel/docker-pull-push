@@ -1,3 +1,5 @@
 output-image
 __pycache__
 alpine
+.idea
+tmp/

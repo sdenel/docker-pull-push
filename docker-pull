@@ -6,7 +6,6 @@ from tempfile import TemporaryDirectory
 import requests
 from pprint import pprint
 import sys
-import zlib
 from subprocess import call
 import os
 import shutil
@@ -70,23 +69,20 @@ def pull(path, token = None):
         assert req.status_code == 200
         return req
 
-def pull_tar_gz_as_tar(cache_dir, url, name, path):
+def pull_tar_gz(cache_dir, url, name, path):
     """
     Get a layer in a compressed format, and saves it locally (unzipped).
     The tar name is expected to contain a hash, thus to be cacheable.
     """
-    cache_name = cache_dir + name
+    cache_name = cache_dir + name.replace(':', '_')
     if not os.path.exists(cache_name):
         response = pull(url + name).content
         with open(cache_name, mode='wb') as localfile:
             localfile.write(response)
             shutil.move(cache_name, cache_name)
-    digest = name.split(':')[-1]
+
     os.makedirs(path[:path.rfind('/')])
     shutil.copyfile(cache_name, path)
-    call(["gunzip", path])
-
-        
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
@@ -105,7 +101,7 @@ if __name__ == '__main__':
     with TemporaryDirectory() as temp_dir:
         args = parse_argv(sys.argv[1])
         web_manifest = pull('https://' + args['registry'] + '/v2/' + args['repository'] + "/manifests/" + args['tag']).json()
-        pprint(web_manifest)
+        #pprint(web_manifest)
         config_digest = web_manifest['config']['digest']
         config = pull('https://' + args['registry'] + '/v2/' + args['repository'] + "/blobs/" + config_digest).json()
         import json
@@ -117,7 +113,7 @@ if __name__ == '__main__':
         layer_path_l = []
         for layer in web_manifest['layers']:
             path = layer['digest'].split(':')[-1] + "/layer.tar"
-            pull_tar_gz_as_tar(
+            pull_tar_gz(
                 CACHE_DIR,
                 'https://' + args['registry'] + '/v2/' + args['repository'] + "/blobs/",
                 layer['digest'],

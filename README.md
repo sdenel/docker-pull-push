@@ -4,7 +4,17 @@ A python script to pull images from a Docker repository without installing Docke
 
 The script creates a cache directory (~/.docker-pull-layers-cache) to store layers already downloaded.
 
-Example:
+# Installation
+```bash
+# With wget:
+wget https://raw.githubusercontent.com/sdenel/docker-pull/master/docker-pull
+# With curl:
+curl https://raw.githubusercontent.com/sdenel/docker-pull/master/docker-pull > docker-pull
+
+# Then:
+chmod +x docker-pull
+```
+# Example
 ```bash
 ./docker-pull index.docker.io/library/alpine alpine
 LOADED_IMAGE_ID=`docker load < alpine | tail -n 1 | cut -d ':' -f 3`

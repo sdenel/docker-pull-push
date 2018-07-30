@@ -25,3 +25,6 @@ then
   echo "$OUTPUT is not equal to \"Hello, world\""
   exit 1
 fi
+
+# Still to do: check that cache works
+# Check that when accepting gzip, the response is compressed
