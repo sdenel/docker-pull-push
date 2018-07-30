@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/sdenel/docker-pull.svg?branch=master)](https://travis-ci.com/sdenel/docker-pull)
+
 A python script to pull images from a Docker repository without installing Docker and its daemon.
 
 The script creates a cache directory (~/.docker-pull-layers-cache) to store layers already downloaded.
