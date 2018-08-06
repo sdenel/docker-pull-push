@@ -24,14 +24,14 @@ def compute_digest(filename):
 
 def parse_dst(dst):
     """
-    >>> parse_dst('http://registry:5000/my/repository')
-    {'https': False, 'host': 'registry:5000', 'path': '/v2/my/repository/'}
-    >>> parse_dst('http://registry:5000/my/repository/')
-    {'https': False, 'host': 'registry:5000', 'path': '/v2/my/repository/'}
-    >>> parse_dst('registry/my/repository/')
-    {'https': True, 'host': 'registry:5000', 'path': '/v2/my/repository/'}
-    >>> parse_dst('registry:5000/my/repository/')
-    {'https': True, 'host': 'registry:5000', 'path': '/v2/my/repository/'}
+    >>> parse_dst('http://registry:5000/my/repository') == {'https': False, 'host': 'registry:5000', 'path': '/v2/my/repository/'}
+    True
+    >>> parse_dst('http://registry:5000/my/repository/') == {'https': False, 'host': 'registry:5000', 'path': '/v2/my/repository/'}
+    True
+    >>> parse_dst('registry/my/repository/') == {'https': True, 'host': 'registry:5000', 'path': '/v2/my/repository/'}
+    True
+    >>> parse_dst('registry:5000/my/repository/') == {'https': True, 'host': 'registry:5000', 'path': '/v2/my/repository/'}
+    True
     """
     if not dst.startswith("http://") and not dst.startswith('https://'):
         dst = "https://" + dst
@@ -111,27 +111,6 @@ def upload_manifest(registry, manifest):
 
 def get_file_size(f):
     return os.path.getsize(f)
-
-
-"""
-{
-  "config": {
-    "digest": "sha256:1358ac6604c5bd5e41ec8b7b633be90ae8f643f791e51f8646c0746874f4a9fa",
-    "mediaType": "application/vnd.docker.container.image.v1+json",
-    "size": 458
-  },
-  "layers": [
-    {
-      "digest": "sha256:8f125ded1b483229a567e48eece98cc8867c2bee55fb73e9cd65ceecc448b7c7",
-      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-      "size": 7689429
-    }
-  ],
-  "mediaType": ,
-  "schemaVersion": 2
-}
-"""
-
 
 def build_manifest(config_f, layers_f):
     json_d = {}

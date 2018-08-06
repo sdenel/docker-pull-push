@@ -6,13 +6,14 @@ The script creates a cache directory (~/.docker-pull-layers-cache) to store laye
 
 # Installation
 ```bash
-# With wget:
-wget https://raw.githubusercontent.com/sdenel/docker-pull/master/docker-pull
-# With curl:
-curl https://raw.githubusercontent.com/sdenel/docker-pull/master/docker-pull > docker-pull
-
-# Then:
+# docker-pull
+curl https://raw.githubusercontent.com/sdenel/docker-pull/master/docker-pull -o docker-pull
 chmod +x docker-pull
+
+# docker-push
+curl https://raw.githubusercontent.com/sdenel/docker-pull/master/docker-push -o docker-push
+chmod +x docker-push
+
 ```
 # Example
 ```bash
