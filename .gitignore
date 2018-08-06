@@ -3,3 +3,5 @@ __pycache__
 alpine
 .idea
 tmp/
+docker-push-tmp
+base

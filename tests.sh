@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
 set -e
 
-# TODO: does not work with gcr.io/distroless/cc@sha256:923564f1d33ac659c15edf538b62f716ed436d7cc5f6a9d64460b8affba9ccd9 !
+#
+# Doc tests
+#
+echo ">>>> Launching unit tests for docker-pull"
+cp docker-pull docker-pull-tmp.py # doctest requires a .py extension
+python3 -m doctest -v docker-pull-tmp.py
+rm docker-pull-tmp.py
+echo ""
+
+echo ">>>> Launching unit tests for docker-push"
+cp docker-push docker-push-tmp.py # doctest requires a .py extension
+python3 -m doctest -v docker-push-tmp.py
+rm docker-push-tmp.py
+echo ""
+
 
 rm -f alpine
 ./docker-pull index.docker.io/library/alpine:3.8 alpine
@@ -26,5 +40,7 @@ then
   exit 1
 fi
 
-# Still to do: check that cache works
-# Check that when accepting gzip, the response is compressed
+# Still to do:
+# * check that cache works
+# * Check that when accepting gzip, the response is compressed
+# * check that push works
