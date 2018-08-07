@@ -1,18 +1,23 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Still to do:
-# * Be compatible with Python 2.X
+# * Check compatibility with Python2 and Python3 during tests
 # * Check if the layer already exists with a HEAD request
 # * Handle Authentification
 
-from tempfile import TemporaryDirectory
+from tempfile import mkdtemp
 import tarfile
 import sys
 import os
 import hashlib
 import json
 from os.path import join
-from http.client import HTTPConnection, HTTPSConnection
+import shutil
+
+try:
+    from http.client import HTTPConnection, HTTPSConnection
+except:
+    from httplib import HTTPConnection, HTTPSConnection
 
 def compute_digest(filename):
     sha256_hash = hashlib.sha256()
@@ -66,7 +71,7 @@ def perform_request(method, registry, path, body=None, headers={}):
     response = None
     try:
         full_path = registry['path'] + path
-        print("> ", method, registry['host'], full_path)
+        print(">  " + method + " " + registry['host'] + " " + full_path)
         h = HTTPSConnection(registry['host']) if registry['https'] else HTTPConnection(registry['host'])
         h.request(method, full_path, body, headers)
         response = h.getresponse()
@@ -76,14 +81,19 @@ def perform_request(method, registry, path, body=None, headers={}):
             if len(data) > 0 and response.getcode() not in [201, 202]:
                 print(data)
         h.close()
-    print("    Return:", response.getcode())
+    print("    Return:" + str(response.status)) #response.getcode())
     return response
 
 
 def upload_blob(registry, src_f, media_type):
     print("* Uploading " + src_f)
     r = perform_request('POST', registry, 'blobs/uploads/')
-    location = r.headers['Location']
+
+    if hasattr(r, 'headers'): # Python 3
+        location = r.headers['Location']
+    else: # Python 2
+        location = [x[1] for x in r.getheaders() if x[0] == 'location'][0]
+
     # TODO: extract and unit test
     location_no_root = location[location.find(registry['path']) + len(registry['path']):]
     with open(src_f, "rb") as content_file:
@@ -97,11 +107,10 @@ def upload_blob(registry, src_f, media_type):
         {'Content-Type': 'application/octet-stream', 'Content-Length': str(len(content))} # 'application/octet-stream'
     )
     # print(r.getcode())
-    # print(r.headers)
+    # print(r.getheaders())
     return
 
 def upload_manifest(registry, manifest):
-    """curl -v -X PUT http://registry.default.svc.cluster.local:5000/v2/bourse/back/manifests/latest -H "Content-Type: application/vnd.docker.distribution.manifest.v2+json" -d @toto.json"""
     print("* Uploading manifest")
     headers = {
         'Content-Type': 'application/vnd.docker.distribution.manifest.v2+json'
@@ -141,8 +150,8 @@ if __name__ == '__main__':
     src = sys.argv[1]
     assert os.path.isfile(src), src + " is not a file / does not exist"
     repository_url = parse_dst(sys.argv[2])
-
-    with TemporaryDirectory() as temp_dir:
+    try:
+        temp_dir = mkdtemp()
         try:
             t = tarfile.TarFile(src)
         except tarfile.ReadError as e:
@@ -151,14 +160,18 @@ if __name__ == '__main__':
         t.extractall(temp_dir)
         manifest_path = os.path.join(temp_dir, "manifest.json")
         with open(manifest_path, "r") as manifest_file:
-            manifest = json.load(manifest_file)
-            config_f = join(temp_dir, manifest[-1]['Config'])
-            layers_f = [join(temp_dir, l) for l in manifest[-1]['Layers']]
+            manifest_content = manifest_file.read()
+            print(manifest_content)
+            manifest = json.loads(manifest_content)
+            manifest = manifest[-1]
+            config = manifest['Config'] if 'Config' in manifest else manifest['config']
+            config_f = join(temp_dir, config)
+            layers = manifest['Layers'] if 'Layers' in manifest else manifest['layers']
+            layers_f = [join(temp_dir, l) for l in layers]
         manifest = build_manifest(config_f, layers_f)
-        # TODO : lister les layers
-        # TODO : uploader la config
-        # TODO: recréer le manifest
         upload_blob(repository_url, config_f, 'application/vnd.docker.container.image.v1+json')
         for layer_f in layers_f:
             upload_blob(repository_url, layer_f, 'application/vnd.docker.image.rootfs.diff.tar.gzip')
         upload_manifest(repository_url, manifest)
+    finally:
+        shutil.rmtree(temp_dir)
