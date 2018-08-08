@@ -52,7 +52,7 @@ def get(url, headers_req={}):
     r = h.getresponse()
 
     if hasattr(r, 'headers'):  # Python 3
-        headers = dict((k.lower(), v) for k, v in dict(r.headers).iteritems())
+        headers = dict((k.lower(), v) for k, v in dict(r.headers).items())
     else:  # Python 2
         headers = dict(r.getheaders())
     status = int(r.status)
@@ -111,7 +111,7 @@ def pull_tar_gz(cache_dir, url, name, path):
     """
     cache_name = cache_dir + name.replace(':', '_')
     if not os.path.exists(cache_name):
-        response = pull(url + name).content
+        response = pull(url + name)['content']
         with open(cache_name, mode='wb') as localfile:
             localfile.write(response)
             shutil.move(cache_name, cache_name)
