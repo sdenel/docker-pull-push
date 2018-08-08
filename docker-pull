@@ -42,11 +42,13 @@ def parse_argv(name):
 
 
 def get(url, headers_req={}):
+    print('GET ' + url)
+    print("    headers = " + str(list(headers_req)))
     protocol = url.split('//')[0]
     host_path = url.split('//')[1]
     host = host_path.split('/')[0]
     path = host_path[len(host):]
-    #print(protocol, host, path)
+    # print(protocol, host, path)
     h = HTTPSConnection(host) if protocol else HTTPConnection(host)
     h.request('GET', path, None, headers_req)
     r = h.getresponse()
@@ -58,6 +60,9 @@ def get(url, headers_req={}):
     status = int(r.status)
 
     if status == 307 or status == 301:
+        # If sent, it sometimes triggers an error 400:
+        # Only one auth mechanism allowed; only the X-Amz-Algorithm query parameter, Signature query string parameter or the Authorization header should be specified
+        del headers_req['Authorization']
         return get(headers['location'], headers_req)
     else:
         return {
@@ -82,13 +87,12 @@ def get_url_from_auth_header(h):
 
 def get_token(url):
     token_req = get(url)['content'].decode()
-    return json.loads(token_req)['token']
+    return str(json.loads(token_req)['token'])
 
 
 def pull(path, token=None):
-    headers = {} if token == None else {'authorization': 'Bearer ' + token}
+    headers = {} if token is None else {'Authorization': 'Bearer ' + token}
     headers['Accept'] = 'application/vnd.docker.distribution.manifest.v2+json'
-    print('GET ' + path)
     req = get(path, headers)
     if req['status'] == 401:
         www_auth = req['headers']['www-authenticate']
@@ -97,12 +101,14 @@ def pull(path, token=None):
         token = get_token(get_url_from_auth_header(www_auth))
         return pull(path, token)
     else:
-        assert req['status'] == 200, str(req['status']) + ": " + req['content']
+        assert req['status'] == 200, str(req['status']) + ": " + str(req['content'])
         return req
+
 
 def pull_json(url, headers_req={}):
     req = pull(url)
     return json.loads(req['content'].decode())
+
 
 def pull_tar_gz(cache_dir, url, name, path):
     """
@@ -141,7 +147,7 @@ if __name__ == '__main__':
             'https://' + args['registry'] + '/v2/' + args['repository'] + "/manifests/" + args['tag']
         )
         # pprint(web_manifest)
-        #print(web_manifest)
+        # print(web_manifest)
         config_digest = web_manifest['config']['digest']
         config = pull_json(
             'https://' + args['registry'] + '/v2/' + args['repository'] + "/blobs/" + config_digest

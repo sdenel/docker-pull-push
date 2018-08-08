@@ -42,6 +42,11 @@ then
   exit 1
 fi
 
+#
+# Regtest: Checking with another image
+#
+./docker-pull index.docker.io/sdenel/tiny-static-web-server:latest tmp-image
+
 
 # Still to do:
 # * check that cache works
