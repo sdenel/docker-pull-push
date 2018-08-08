@@ -16,7 +16,9 @@ python3 -m doctest -v docker-push-tmp.py
 rm docker-push-tmp.py
 echo ""
 
-
+#
+# Checking that pull is working fine
+#
 rm -f alpine
 ./docker-pull index.docker.io/library/alpine:3.8 alpine
 
@@ -39,6 +41,7 @@ then
   echo "$OUTPUT is not equal to \"Hello, world\""
   exit 1
 fi
+
 
 # Still to do:
 # * check that cache works

@@ -1,11 +1,17 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
-from tempfile import TemporaryDirectory
-import requests
+from tempfile import mkdtemp
 import sys
 import os
 import shutil
 import tarfile
+import json
+
+try:
+    from http.client import HTTPConnection, HTTPSConnection
+except:
+    from httplib import HTTPConnection, HTTPSConnection
+
 
 def parse_argv(name):
     """
@@ -26,13 +32,40 @@ def parse_argv(name):
     """
     registry = name[:name.find('/')]
 
-    repository_raw = name[len(registry)+1:]
+    repository_raw = name[len(registry) + 1:]
     repository_split = repository_raw.split(':')
-    tag = 'latest' if len(repository_split)==1 else repository_split[-1]
-    
+    tag = 'latest' if len(repository_split) == 1 else repository_split[-1]
+
     out = {}
-    out['registry'] = registry 
-    return {'registry': registry, 'repository': repository_split[0],'tag': tag}
+    out['registry'] = registry
+    return {'registry': registry, 'repository': repository_split[0], 'tag': tag}
+
+
+def get(url, headers_req={}):
+    protocol = url.split('//')[0]
+    host_path = url.split('//')[1]
+    host = host_path.split('/')[0]
+    path = host_path[len(host):]
+    #print(protocol, host, path)
+    h = HTTPSConnection(host) if protocol else HTTPConnection(host)
+    h.request('GET', path, None, headers_req)
+    r = h.getresponse()
+
+    if hasattr(r, 'headers'):  # Python 3
+        headers = dict((k.lower(), v) for k, v in r.headers.iteritems())
+    else:  # Python 2
+        headers = dict(r.getheaders())
+    status = int(r.status)
+
+    if status == 307 or status == 301:
+        return get(headers['location'], headers_req)
+    else:
+        return {
+            'status': status,
+            'headers': headers,
+            'content': r.read()
+        }
+
 
 def get_url_from_auth_header(h):
     """
@@ -46,24 +79,30 @@ def get_url_from_auth_header(h):
     out = out.replace('",', '&').replace('="', '=')
     return out.rstrip('"')
 
-def get_token(url):
-    token_req = requests.get(url)
-    return token_req.json()['token']
 
-def pull(path, token = None):
-    headers = {} if token == None else {'Authorization': 'Bearer ' + token}
+def get_token(url):
+    token_req = get(url)['content'].decode()
+    return json.loads(token_req)['token']
+
+
+def pull(path, token=None):
+    headers = {} if token == None else {'authorization': 'Bearer ' + token}
     headers['Accept'] = 'application/vnd.docker.distribution.manifest.v2+json'
     print('GET ' + path)
-    req = requests.get(path, headers=headers)
-    if req.status_code == 401:
-        www_auth = req.headers['Www-Authenticate']
+    req = get(path, headers)
+    if req['status'] == 401:
+        www_auth = req['headers']['www-authenticate']
         assert www_auth.startswith('Bearer realm="')
         url = www_auth.split('"')[2]
         token = get_token(get_url_from_auth_header(www_auth))
         return pull(path, token)
     else:
-        assert req.status_code == 200
+        assert req['status'] == 200, str(req['status']) + ": " + req['content']
         return req
+
+def pull_json(url, headers_req={}):
+    req = pull(url)
+    return json.loads(req['content'].decode())
 
 def pull_tar_gz(cache_dir, url, name, path):
     """
@@ -80,6 +119,7 @@ def pull_tar_gz(cache_dir, url, name, path):
     os.makedirs(path[:path.rfind('/')])
     shutil.copyfile(cache_name, path)
 
+
 if __name__ == '__main__':
     if len(sys.argv) != 3:
         print("docker-pull fullname target")
@@ -94,12 +134,18 @@ if __name__ == '__main__':
         print("Creating cache directory: " + CACHE_DIR)
         os.makedirs(CACHE_DIR)
 
-    with TemporaryDirectory() as temp_dir:
+    try:
+        temp_dir = mkdtemp()
         args = parse_argv(sys.argv[1])
-        web_manifest = pull('https://' + args['registry'] + '/v2/' + args['repository'] + "/manifests/" + args['tag']).json()
-        #pprint(web_manifest)
+        web_manifest = pull_json(
+            'https://' + args['registry'] + '/v2/' + args['repository'] + "/manifests/" + args['tag']
+        )
+        # pprint(web_manifest)
+        #print(web_manifest)
         config_digest = web_manifest['config']['digest']
-        config = pull('https://' + args['registry'] + '/v2/' + args['repository'] + "/blobs/" + config_digest).json()
+        config = pull_json(
+            'https://' + args['registry'] + '/v2/' + args['repository'] + "/blobs/" + config_digest
+        )
         import json
 
         config_filename = config_digest.split(':')[1] + '.json'
@@ -116,7 +162,7 @@ if __name__ == '__main__':
                 temp_dir + '/' + path
             )
             layer_path_l.append(path)
-        
+
         manifest = [{"Config": config_filename, "RepoTags": [], "Layers": layer_path_l}]
         with open(temp_dir + '/' + 'manifest.json', 'w') as outfile:
             json.dump(manifest, outfile)
@@ -124,3 +170,5 @@ if __name__ == '__main__':
         with tarfile.open(sys.argv[2], "w") as tar_out:
             os.chdir(temp_dir)
             tar_out.add(".")
+    finally:
+        shutil.rmtree(temp_dir)
