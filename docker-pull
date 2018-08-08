@@ -52,7 +52,7 @@ def get(url, headers_req={}):
     r = h.getresponse()
 
     if hasattr(r, 'headers'):  # Python 3
-        headers = dict((k.lower(), v) for k, v in r.headers.iteritems())
+        headers = dict((k.lower(), v) for k, v in dict(r.headers).iteritems())
     else:  # Python 2
         headers = dict(r.getheaders())
     status = int(r.status)
