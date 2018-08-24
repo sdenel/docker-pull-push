@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/sdenel/docker-pull.svg?branch=master)](https://travis-ci.com/sdenel/docker-pull)
+[![Build Status](https://travis-ci.com/sdenel/docker-pull.svg?branch=master)](https://travis-ci.com/sdenel/docker-pull-push)
 
 A python script to pull images from a Docker repository without installing Docker and its daemon.
 
